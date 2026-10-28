@@ -64,6 +64,14 @@ bool CppHeapPointerTableEntry::HasPointer(
   return payload.IsTaggedWithTagIn(tag_range);
 }
 
+// kun: one load, so the tag checked is the one of the pointer returned.
+Address CppHeapPointerTableEntry::TryGetPointer(
+    CppHeapPointerTagRange tag_range) const {
+  auto payload = payload_.load(std::memory_order_relaxed);
+  if (!payload.IsTaggedWithTagIn(tag_range)) return kNullAddress;
+  return payload.Untag(tag_range);
+}
+
 void CppHeapPointerTableEntry::MakeZappedEntry() {
   Payload new_payload(kNullAddress, CppHeapPointerTag::kZappedEntryTag);
   payload_.store(new_payload, std::memory_order_relaxed);
@@ -126,6 +134,12 @@ Address CppHeapPointerTable::Get(CppHeapPointerHandle handle,
   uint32_t index = HandleToIndex(handle);
   DCHECK(index == 0 || at(index).HasPointer(tag_range));
   return at(index).GetPointer(tag_range);
+}
+
+// kun: include/v8-kun.h.
+Address CppHeapPointerTable::TryGet(CppHeapPointerHandle handle,
+                                    CppHeapPointerTagRange tag_range) const {
+  return at(HandleToIndex(handle)).TryGetPointer(tag_range);
 }
 
 void CppHeapPointerTable::Set(CppHeapPointerHandle handle, Address value,

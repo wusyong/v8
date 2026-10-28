@@ -604,7 +604,7 @@ void VisitObjectWithCppHeapPointerField(
   DCHECK(!HeapLayout::InYoungGeneration(object));
 
   // kun: the embedder heap's object isn't cppgc's (include/v8-kun.h).
-  if (CppHeapObjectWrapper::From(object).GetCppHeapWrappable(
+  if (CppHeapObjectWrapper::From(object).TryGetCppHeapWrappable(
           isolate, kun::kTagRange)) {
     return;
   }

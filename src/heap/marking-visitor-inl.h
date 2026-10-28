@@ -299,7 +299,7 @@ void MarkingVisitorBase<ConcreteVisitor>::VisitCppHeapPointer(
   table->Mark(space, handle, slot.address());
   // kun: the embedder heap's object, not a cppgc one: its to mark
   // (include/v8-kun.h). Another tag's entry reads as none here.
-  if (Address object = table->Get(handle, kun::kTagRange)) {
+  if (Address object = table->TryGet(handle, kun::kTagRange)) {
     local_marking_worklists_->cpp_marking_state()->HandObject(
         reinterpret_cast<void*>(object));
     return;

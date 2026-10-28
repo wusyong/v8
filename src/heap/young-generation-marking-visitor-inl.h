@@ -69,7 +69,7 @@ void YoungGenerationMarkingVisitor<marking_mode>::VisitCppHeapPointer(
   }
   const CppHeapPointerTable& table = isolate_->cpp_heap_pointer_table();
   // kun: the embedder heap's object isn't cppgc's (include/v8-kun.h).
-  if (table.Get(handle, kun::kTagRange)) return;
+  if (table.TryGet(handle, kun::kTagRange)) return;
   Address cpp_heap_pointer = table.Get(handle, kAnyCppHeapPointer);
 #else   // !V8_COMPRESS_POINTERS
   Address cpp_heap_pointer = slot.load();

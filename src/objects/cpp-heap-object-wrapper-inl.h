@@ -59,6 +59,14 @@ void* CppHeapObjectWrapper::GetCppHeapWrappable(
       object_->ReadCppHeapPointerField(offset_, isolate, tag_range));
 }
 
+// kun: include/v8-kun.h.
+void* CppHeapObjectWrapper::TryGetCppHeapWrappable(
+    IsolateForPointerCompression isolate,
+    CppHeapPointerTagRange tag_range) const {
+  return reinterpret_cast<void*>(TryReadCppHeapPointerField(
+      object_->RawCppHeapPointerField(offset_).address(), isolate, tag_range));
+}
+
 void CppHeapObjectWrapper::SetCppHeapWrappable(
     IsolateForPointerCompression isolate, void* instance,
     CppHeapPointerTag tag) {

@@ -37,6 +37,11 @@ class CppHeapObjectWrapper {
       IsolateForPointerCompression isolate) const;
   V8_INLINE void* GetCppHeapWrappable(IsolateForPointerCompression isolate,
                                       CppHeapPointerTagRange tag_range) const;
+  // kun: nullptr unless the wrapper's entry has a tag within the range,
+  // whatever tag it has (include/v8-kun.h).
+  V8_INLINE void* TryGetCppHeapWrappable(
+      IsolateForPointerCompression isolate,
+      CppHeapPointerTagRange tag_range) const;
 
  private:
   static_assert(offsetof(JSAPIObjectWithEmbedderSlots, cpp_heap_wrappable_) ==

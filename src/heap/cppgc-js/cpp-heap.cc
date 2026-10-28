@@ -1529,11 +1529,11 @@ void* Unwrap(v8::Isolate* isolate, Local<Object> wrapper, uint16_t tag) {
   if (!internal::IsJSApiWrapperObject(internal::Cast<internal::HeapObject>(obj))) {
     return nullptr;
   }
-  // Another tag's entry reads as none.
+  // Another tag's entry reads as none, as with Object::Unwrap.
   const auto tag_value = static_cast<CppHeapPointerTag>(tag);
   return internal::CppHeapObjectWrapper(internal::Cast<internal::JSObject>(obj))
-      .GetCppHeapWrappable(reinterpret_cast<internal::Isolate*>(isolate),
-                           CppHeapPointerTagRange(tag_value, tag_value));
+      .TryGetCppHeapWrappable(reinterpret_cast<internal::Isolate*>(isolate),
+                              CppHeapPointerTagRange(tag_value, tag_value));
 }
 
 namespace {

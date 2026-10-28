@@ -88,7 +88,7 @@ void WriteBarrier::MarkingSlowFromCppHeapWrappable(
               reinterpret_cast<Address>(object));
   // kun: the embedder heap's object isn't cppgc's; one wrapped while it
   // marks is marked already, black or in its snapshot (include/v8-kun.h).
-  if (table.Get(handle, kun::kTagRange)) return;
+  if (table.TryGet(handle, kun::kTagRange)) return;
 #endif  // V8_COMPRESS_POINTERS
 
   if (heap->cpp_heap() && object) {

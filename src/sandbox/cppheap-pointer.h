@@ -21,6 +21,12 @@ V8_INLINE Address ReadCppHeapPointerField(Address field_address,
                                           IsolateForPointerCompression isolate,
                                           CppHeapPointerTagRange tag_range);
 
+// kun: kNullAddress unless the field's entry has a tag within the range,
+// whatever tag it has (include/v8-kun.h).
+V8_INLINE Address TryReadCppHeapPointerField(
+    Address field_address, IsolateForPointerCompression isolate,
+    CppHeapPointerTagRange tag_range);
+
 V8_INLINE void WriteLazilyInitializedCppHeapPointerField(
     Address field_address, IsolateForPointerCompression isolate, Address value,
     CppHeapPointerTag tag);

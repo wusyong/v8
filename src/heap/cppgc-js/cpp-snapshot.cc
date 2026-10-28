@@ -80,7 +80,7 @@ void* ExtractEmbedderDataBackref(Isolate* isolate, CppHeap& cpp_heap,
     return nullptr;
   }
   // kun: the embedder heap's object isn't cppgc's (include/v8-kun.h).
-  if (CppHeapObjectWrapper(js_object).GetCppHeapWrappable(
+  if (CppHeapObjectWrapper(js_object).TryGetCppHeapWrappable(
           isolate, kun::kTagRange)) {
     return nullptr;
   }
@@ -522,7 +522,7 @@ void CppGraphBuilderImpl::RecordTracedReferenceOnStack(
 void CppGraphBuilderImpl::AddEdgeForCppHeapWrapper(
     Tagged<CppHeapPointerWrapperObjectT> object) {
   // kun: the embedder heap's object isn't cppgc's (include/v8-kun.h).
-  if (CppHeapObjectWrapper::From(object).GetCppHeapWrappable(
+  if (CppHeapObjectWrapper::From(object).TryGetCppHeapWrappable(
           cpp_heap_.isolate(), kun::kTagRange)) {
     return;
   }

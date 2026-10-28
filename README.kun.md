@@ -53,6 +53,17 @@ Code changes are marked with `kun:` comments.
     the detached-wrapper query leave it alone. An object wrapped while V8
     marks is marked already on the embedder's side (black, or in its
     snapshot), so the barrier hands nothing over.
+  - `src/sandbox/cppheap-pointer-table{.h,-inl.h}`,
+    `src/sandbox/cppheap-pointer{.h,-inl.h}`,
+    `src/objects/cpp-heap-object-wrapper{.h,-inl.h}`:
+    `CppHeapPointerTable::TryGet`, `TryReadCppHeapPointerField` and
+    `CppHeapObjectWrapper::TryGetCppHeapWrappable` read an entry of any
+    tag and return null unless its tag is within the range, as the public
+    `Object::Unwrap` does. Everything above that asks whether an entry
+    holds one of the tags, and `kun::Unwrap`, reads through them: `Get`
+    expects the caller to know the entry's tag (a debug build's `DCHECK`),
+    and a cppgc wrapper's or V8's own entries (a `NativeContext`'s, marked
+    by `mksnapshot`) don't have one of kun's (2026-10-28).
 
   Only with pointer compression: the tags are the `CppHeapPointerTable`'s.
   Nothing changes until an embedder marking is set: cppgc's heap and
@@ -63,6 +74,7 @@ Code changes are marked with `kun:` comments.
 When rusty_v8 moves to a new V8 version: rebase `kun` onto the commit
 that rusty_v8's new tag pins (on `denoland/v8`'s branch for that version),
 check each `kun:` change against the code it hooks (`CppHeap`'s marking,
-`MarkingVisitorBase::VisitCppHeapPointer`, `CppHeapObjectWrapper`), push
-it, and point kun's rusty_v8 fork's submodule at it (that fork's
+`MarkingVisitorBase::VisitCppHeapPointer`, `CppHeapObjectWrapper`,
+`CppHeapPointerTable::Get`; a release build doesn't run V8's `DCHECK`s,
+the debug jobs of rusty_v8's `kun-release` workflow do), push it, and point kun's rusty_v8 fork's submodule at it (that fork's
 `README.kun.md`, "Updating").

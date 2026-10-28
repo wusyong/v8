@@ -67,7 +67,7 @@ std::vector<v8::Local<v8::Value>> HeapProfiler::GetDetachedJSWrapperObjects() {
     CppHeapObjectWrapper wrapper = CppHeapObjectWrapper(Cast<JSObject>(obj));
     if (!wrapper.GetCppHeapWrappable(isolate(), kAnyCppHeapPointer)) continue;
     // kun: the embedder heap's object isn't cppgc's (include/v8-kun.h).
-    if (wrapper.GetCppHeapWrappable(isolate(), kun::kTagRange)) {
+    if (wrapper.TryGetCppHeapWrappable(isolate(), kun::kTagRange)) {
       continue;
     }
 

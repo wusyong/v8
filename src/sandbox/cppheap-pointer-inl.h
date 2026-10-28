@@ -53,6 +53,22 @@ V8_INLINE Address ReadCppHeapPointerField(Address field_address,
 #endif  // !V8_COMPRESS_POINTERS
 }
 
+// kun: include/v8-kun.h.
+V8_INLINE Address TryReadCppHeapPointerField(
+    Address field_address, IsolateForPointerCompression isolate,
+    CppHeapPointerTagRange tag_range) {
+  CppHeapPointerSlot slot(field_address);
+#ifdef V8_COMPRESS_POINTERS
+  // Loaded as in ReadCppHeapPointerField.
+  CppHeapPointerHandle handle = slot.Relaxed_LoadHandle();
+  return isolate.GetCppHeapPointerTable().TryGet(handle, tag_range);
+#else   // !V8_COMPRESS_POINTERS
+  // No tags to tell the embedder heap's objects by: it needs pointer
+  // compression.
+  return slot.load();
+#endif  // !V8_COMPRESS_POINTERS
+}
+
 V8_INLINE void WriteLazilyInitializedCppHeapPointerField(
     Address field_address, IsolateForPointerCompression isolate, Address value,
     CppHeapPointerTag tag) {
