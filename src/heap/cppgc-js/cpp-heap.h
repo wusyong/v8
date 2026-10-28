@@ -178,7 +178,7 @@ class V8_EXPORT_PRIVATE CppHeap final
   size_t embedder_used_size() const {
     return embedder_used_size_.load(std::memory_order_relaxed);
   }
-  void ReportEmbedderAllocation(int64_t delta);
+  void ReportEmbedderUsedSize(size_t used);
 
   // StatsCollector::AllocationObserver interface.
   void AllocatedObjectSizeIncreased(size_t) final;

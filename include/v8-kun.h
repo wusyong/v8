@@ -12,6 +12,7 @@
 #ifndef INCLUDE_V8_KUN_H_
 #define INCLUDE_V8_KUN_H_
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "v8-local-handle.h"  // NOLINT(build/include_directory)
@@ -56,8 +57,15 @@ class EmbedderMarking {
   /** Whether nothing is left now (V8's locals published). */
   virtual bool IsDone() = 0;
 
-  /** Both sides are done (in the pause, after V8 cleared what died). */
-  virtual void End() = 0;
+  /**
+   * Both sides are done (in the pause, after V8 cleared what died).
+   * Returns the embedder heap's used bytes after the marking: its live
+   * ones (what it marked, and what it allocated while it marked), not the
+   * dead it has yet to sweep. V8 counts them as its size from now on and
+   * sets its next limits from them, as from cppgc's marked bytes
+   * (StatsCollector::NotifyMarkingCompleted).
+   */
+  virtual size_t End() = 0;
 
   /**
    * A marking thread's list of wrapped objects to hand over, with the
@@ -74,12 +82,12 @@ class EmbedderMarking {
 V8_EXPORT void SetEmbedderMarking(CppHeap* heap, EmbedderMarking* marking);
 
 /**
- * The embedder heap's used bytes changed by `delta` since last told
- * (cppgc's ReportBufferedAllocationSizeIfPossible): V8 counts them with
- * cppgc's, and may start, advance or finish a major GC now. Only between
- * the embedder heap's operations.
+ * The embedder heap's used bytes are `used` now (cppgc's
+ * ReportBufferedAllocationSizeIfPossible, as a total): V8 counts them with
+ * cppgc's, and on growth may start, advance or finish a major GC now. Only
+ * between the embedder heap's operations.
  */
-V8_EXPORT void ReportEmbedderAllocation(Isolate* isolate, int64_t delta);
+V8_EXPORT void ReportEmbedderUsedSize(Isolate* isolate, size_t used);
 
 /** Finishes a major GC's marking that runs, atomically (its concurrent
  * markers joined): afterwards no V8 thread marks, nor calls the embedder

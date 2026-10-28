@@ -32,8 +32,14 @@ Code changes are marked with `kun:` comments.
     first: with `--single-threaded-gc` V8 shares none of that thread's
     work), asked whether it is done (`IsMarkingDone`), and ended in the
     pause (`FinishMarkingAndProcessWeakness`). Its used bytes count with
-    cppgc's (`EmbedderSizeOfObjects`, in `heap.cc`) and may start or
-    advance a GC as cppgc's allocations do (`ReportEmbedderAllocation`).
+    cppgc's (`EmbedderSizeOfObjects`, in `heap.cc`): the embedder tells
+    their total (`ReportEmbedderUsedSize`), whose growth may start or
+    advance a GC as cppgc's allocations do, and its marking's `End` returns
+    its live bytes, which become its used bytes before V8 sets its next
+    limits from them (as cppgc's marked bytes do,
+    `StatsCollector::NotifyMarkingCompleted`); else V8 would count the
+    dead the embedder has yet to sweep, and its limits would grow fourfold
+    each GC.
     `kun::Wrap` and `Unwrap` put the embedder's object's address in a
     wrapper's `CppHeapPointerTable` entry with a tag of
     `kun::kTagRange` (`0x4000..=0x4fff`). `kun::TracedMarker` is the

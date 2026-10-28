@@ -1011,7 +1011,11 @@ void CppHeap::FinishMarkingAndProcessWeakness() {
   if (embedder_marks()) {
     CHECK(embedder_marking_->IsDone());
     embedder_marking_started_ = false;
-    embedder_marking_->End();
+    // kun: the embedder heap's live bytes, before V8 sets its limits from
+    // its size (Heap::MarkCompact's UpdateConsumedAfterGC), as cppgc's
+    // marked bytes are.
+    embedder_used_size_.store(embedder_marking_->End(),
+                              std::memory_order_relaxed);
   }
 
 #if defined(CPPGC_YOUNG_GENERATION)
@@ -1350,18 +1354,11 @@ CppHeap::CreateCppMarkingStateForMutatorThread() {
 }
 
 // kun: as ReportBufferedAllocationSizeIfPossible, for the embedder heap's
-// used bytes (include/v8-kun.h).
-void CppHeap::ReportEmbedderAllocation(int64_t delta) {
-  if (delta < 0) {
-    size_t decrease = static_cast<size_t>(-delta);
-    size_t used = embedder_used_size_.load(std::memory_order_relaxed);
-    embedder_used_size_.store(used > decrease ? used - decrease : 0,
-                              std::memory_order_relaxed);
-    return;
-  }
-  embedder_used_size_.fetch_add(static_cast<size_t>(delta),
-                                std::memory_order_relaxed);
-  embedder_allocated_size_ += delta;
+// used bytes, a total (include/v8-kun.h).
+void CppHeap::ReportEmbedderUsedSize(size_t used) {
+  size_t before = embedder_used_size_.exchange(used, std::memory_order_relaxed);
+  if (used <= before) return;
+  embedder_allocated_size_ += used - before;
   if (!IsGCAllowed() || !v8_flags.incremental_marking) return;
   if (embedder_allocated_size_ <= embedder_allocated_size_limit_for_check_) {
     return;
@@ -1497,10 +1494,10 @@ void SetEmbedderMarking(v8::CppHeap* heap, EmbedderMarking* marking) {
   internal::CppHeap::From(heap)->set_embedder_marking(marking);
 }
 
-void ReportEmbedderAllocation(v8::Isolate* isolate, int64_t delta) {
+void ReportEmbedderUsedSize(v8::Isolate* isolate, size_t used) {
   auto* heap = reinterpret_cast<internal::Isolate*>(isolate)->heap();
   if (!heap->cpp_heap()) return;
-  internal::CppHeap::From(heap->cpp_heap())->ReportEmbedderAllocation(delta);
+  internal::CppHeap::From(heap->cpp_heap())->ReportEmbedderUsedSize(used);
 }
 
 void FinishMarking(v8::Isolate* isolate) {
