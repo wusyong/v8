@@ -5,6 +5,7 @@
 #ifndef V8_HEAP_MARKING_VISITOR_INL_H_
 #define V8_HEAP_MARKING_VISITOR_INL_H_
 
+#include "include/v8-kun.h"  // kun
 #include "src/heap/marking-visitor.h"
 // Include the non-inl header before the rest of the headers.
 
@@ -296,6 +297,13 @@ void MarkingVisitorBase<ConcreteVisitor>::VisitCppHeapPointer(
   CppHeapPointerTable* table = cpp_heap_pointer_table_;
   CppHeapPointerTable::Space* space = heap_->cpp_heap_pointer_space();
   table->Mark(space, handle, slot.address());
+  // kun: the embedder heap's object, not a cppgc one: its to mark
+  // (include/v8-kun.h). Another tag's entry reads as none here.
+  if (Address object = table->Get(handle, kun::kTagRange)) {
+    local_marking_worklists_->cpp_marking_state()->HandObject(
+        reinterpret_cast<void*>(object));
+    return;
+  }
   Address cpp_heap_pointer = table->Get(handle, kAnyCppHeapPointer);
 #else   // !V8_COMPRESS_POINTERS
   Address cpp_heap_pointer = slot.load();

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "include/v8-kun.h"  // kun
 #include "src/heap/cppgc-js/cpp-snapshot.h"
 
 #include <memory>
@@ -76,6 +77,11 @@ void* ExtractEmbedderDataBackref(Isolate* isolate, CppHeap& cpp_heap,
   Tagged<JSObject> js_object = Cast<JSObject>(*v8_object);
   // Not every object that can have embedder fields is actually a JSApiWrapper.
   if (!IsJSApiWrapperObject(js_object)) {
+    return nullptr;
+  }
+  // kun: the embedder heap's object isn't cppgc's (include/v8-kun.h).
+  if (CppHeapObjectWrapper(js_object).GetCppHeapWrappable(
+          isolate, kun::kTagRange)) {
     return nullptr;
   }
   // Wrapper using cpp_heap_wrappable field.
@@ -515,6 +521,11 @@ void CppGraphBuilderImpl::RecordTracedReferenceOnStack(
 
 void CppGraphBuilderImpl::AddEdgeForCppHeapWrapper(
     Tagged<CppHeapPointerWrapperObjectT> object) {
+  // kun: the embedder heap's object isn't cppgc's (include/v8-kun.h).
+  if (CppHeapObjectWrapper::From(object).GetCppHeapWrappable(
+          cpp_heap_.isolate(), kun::kTagRange)) {
+    return;
+  }
   void* cpp_object = CppHeapObjectWrapper::From(object).GetCppHeapWrappable(
       cpp_heap_.isolate(), kAnyCppHeapPointer);
   if (!cpp_object) {

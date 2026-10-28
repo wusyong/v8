@@ -5356,7 +5356,10 @@ size_t Heap::YoungGenerationConsumedBytes() const {
 }
 
 size_t Heap::EmbedderSizeOfObjects() const {
-  return cpp_heap_ ? CppHeap::From(cpp_heap_)->used_size() : 0;
+  // kun: with the embedder heap's (include/v8-kun.h).
+  return cpp_heap_ ? CppHeap::From(cpp_heap_)->used_size() +
+                         CppHeap::From(cpp_heap_)->embedder_used_size()
+                   : 0;
 }
 
 uint64_t Heap::GlobalSizeOfObjects() const {

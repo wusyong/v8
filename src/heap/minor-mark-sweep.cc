@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "include/v8-kun.h"  // kun
 #include "src/heap/minor-mark-sweep.h"
 
 #include <algorithm>
@@ -602,6 +603,11 @@ void VisitObjectWithCppHeapPointerField(
   DCHECK(IsCppHeapPointerWrapperObject(object));
   DCHECK(!HeapLayout::InYoungGeneration(object));
 
+  // kun: the embedder heap's object isn't cppgc's (include/v8-kun.h).
+  if (CppHeapObjectWrapper::From(object).GetCppHeapWrappable(
+          isolate, kun::kTagRange)) {
+    return;
+  }
   // Wrapper using cpp_heap_wrappable field.
   void* wrappable = CppHeapObjectWrapper::From(object).GetCppHeapWrappable(
       isolate, kAnyCppHeapPointer);

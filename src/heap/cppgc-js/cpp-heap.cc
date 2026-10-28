@@ -12,8 +12,10 @@
 #include "include/cppgc/heap-consistency.h"
 #include "include/cppgc/platform.h"
 #include "include/v8-isolate.h"
+#include "include/v8-kun.h"
 #include "include/v8-local-handle.h"
 #include "include/v8-platform.h"
+#include "src/api/api-inl.h"
 #include "src/base/logging.h"
 #include "src/base/macros.h"
 #include "src/base/platform/time.h"
@@ -49,10 +51,12 @@
 #include "src/heap/gc-tracer.h"
 #include "src/heap/heap-controller.h"
 #include "src/heap/heap.h"
+#include "src/heap/incremental-marking.h"
 #include "src/heap/marking-worklist.h"
 #include "src/heap/minor-mark-sweep.h"
 #include "src/heap/traced-handles-marking-visitor.h"
 #include "src/init/v8.h"
+#include "src/objects/cpp-heap-object-wrapper-inl.h"  // kun
 #include "src/profiler/heap-profiler.h"
 
 namespace v8 {
@@ -837,6 +841,12 @@ void CppHeap::InitializeMarking(
   marker_ = std::make_unique<UnifiedHeapMarker>(
       isolate_ ? isolate()->heap() : nullptr, AsBase(), schedule,
       platform_.get(), marking_config);
+  // kun: the embedder heap marks with major GCs, from now on: V8 makes its
+  // marking states, each with the embedder heap's local, before it starts
+  // ours (StartMarking).
+  embedder_marking_started_ =
+      embedder_marking_ && *collection_type_ == CollectionType::kMajor;
+  if (embedder_marking_started_) embedder_marking_->Start();
 }
 
 namespace {
@@ -865,6 +875,11 @@ void CppHeap::StartMarking() {
   marking_done_ = false;
 }
 
+// kun: whether the embedder heap marks in this GC.
+bool CppHeap::embedder_marks() const {
+  return TracingInitialized() && embedder_marking_started_;
+}
+
 size_t CppHeap::last_bytes_marked() const {
   DCHECK(TracingInitialized());
   return TracingInitialized() ? marker_->last_bytes_marked() : 0;
@@ -876,6 +891,8 @@ bool CppHeap::AdvanceMarking(v8::base::TimeDelta max_duration,
   if (!TracingInitialized()) {
     return true;
   }
+  // kun: the embedder heap's step gets what cppgc's leaves of the step.
+  const auto step_start = v8::base::TimeTicks::Now();
   is_in_v8_marking_step_ = true;
   cppgc::internal::StatsCollector::EnabledScope stats_scope(
       stats_collector(),
@@ -889,12 +906,34 @@ bool CppHeap::AdvanceMarking(v8::base::TimeDelta max_duration,
   marking_done_ = marker_->To<UnifiedHeapMarker>().AdvanceMarkingOnStep(
       max_duration, marked_bytes_limit, stack_state);
   DCHECK_IMPLIES(in_atomic_pause_, marking_done_);
+  // kun: the embedder heap advances with cppgc, every step (what the step
+  // marked may have handed it more); IsMarkingDone asks it again.
+  bool embedder_done = true;
+  if (embedder_marks()) {
+    // What V8's main thread handed over since, first: its pause waits for
+    // that thread's local to empty.
+    if (isolate_) {
+      if (auto* local = GetV8MarkingWorklists(isolate_, *collection_type_)) {
+        if (auto* state = local->cpp_marking_state()) {
+          state->PublishHandedObjects();
+        }
+      }
+    }
+    const auto left = max_duration - (v8::base::TimeTicks::Now() - step_start);
+    embedder_done = embedder_marking_->Advance(
+        left < v8::base::TimeDelta() ? 0.0 : left.InMillisecondsF(),
+        in_atomic_pause_);
+  }
   is_in_v8_marking_step_ = false;
-  return marking_done_;
+  return marking_done_ && embedder_done;
 }
 
 bool CppHeap::IsMarkingDone() const {
-  return !TracingInitialized() || marking_done_;
+  // kun: and the embedder heap's, as it is now (V8's threads may have
+  // handed it more since its last step).
+  return !TracingInitialized() ||
+         (marking_done_ &&
+          (!embedder_marks() || embedder_marking_->IsDone()));
 }
 
 bool CppHeap::ShouldFinalizeIncrementalMarking() const {
@@ -968,6 +1007,12 @@ void CppHeap::ProcessCrossThreadWeakness() {
 void CppHeap::FinishMarkingAndProcessWeakness() {
   CHECK(in_atomic_pause_);
   CHECK(marking_done_);
+  // kun: both sides are done; the embedder heap ends its marking.
+  if (embedder_marks()) {
+    CHECK(embedder_marking_->IsDone());
+    embedder_marking_started_ = false;
+    embedder_marking_->End();
+  }
 
 #if defined(CPPGC_YOUNG_GENERATION)
   // Check if the young generation was enabled via flag. We must enable young
@@ -1281,17 +1326,60 @@ void CppHeap::FinishSweepingIfOutOfWork() { sweeper_.FinishIfOutOfWork(); }
 std::unique_ptr<CppMarkingState> CppHeap::CreateCppMarkingState() {
   if (!TracingInitialized()) return {};
   DCHECK(IsMarking());
-  return std::make_unique<CppMarkingState>(
+  auto state = std::make_unique<CppMarkingState>(
       std::make_unique<cppgc::internal::MarkingStateBase>(
           AsBase(), marker()->To<UnifiedHeapMarker>().GetMarkingWorklists()));
+  // kun: the embedder heap's local, for the objects V8 hands over.
+  if (embedder_marks()) {
+    state->set_kun_local(embedder_marking_, embedder_marking_->NewLocal());
+  }
+  return state;
 }
 
 std::unique_ptr<CppMarkingState>
 CppHeap::CreateCppMarkingStateForMutatorThread() {
   if (!TracingInitialized()) return {};
   DCHECK(IsMarking());
-  return std::make_unique<CppMarkingState>(
+  auto state = std::make_unique<CppMarkingState>(
       marker()->To<UnifiedHeapMarker>().GetMutatorMarkingState());
+  // kun: as above.
+  if (embedder_marks()) {
+    state->set_kun_local(embedder_marking_, embedder_marking_->NewLocal());
+  }
+  return state;
+}
+
+// kun: as ReportBufferedAllocationSizeIfPossible, for the embedder heap's
+// used bytes (include/v8-kun.h).
+void CppHeap::ReportEmbedderAllocation(int64_t delta) {
+  if (delta < 0) {
+    size_t decrease = static_cast<size_t>(-delta);
+    size_t used = embedder_used_size_.load(std::memory_order_relaxed);
+    embedder_used_size_.store(used > decrease ? used - decrease : 0,
+                              std::memory_order_relaxed);
+    return;
+  }
+  embedder_used_size_.fetch_add(static_cast<size_t>(delta),
+                                std::memory_order_relaxed);
+  embedder_allocated_size_ += delta;
+  if (!IsGCAllowed() || !v8_flags.incremental_marking) return;
+  if (embedder_allocated_size_ <= embedder_allocated_size_limit_for_check_) {
+    return;
+  }
+  Heap* heap = isolate_->heap();
+  heap->StartIncrementalMarkingIfAllocationLimitIsReached(
+      heap->main_thread_local_heap(), heap->GCFlagsForIncrementalMarking(),
+      kGCCallbackScheduleIdleGarbageCollection);
+  if (heap->incremental_marking()->IsMajorMarking()) {
+    if (heap->AllocationLimitOvershotByLargeMargin()) {
+      heap->FinalizeIncrementalMarkingAtomically(
+          i::GarbageCollectionReason::kExternalFinalize);
+    } else {
+      heap->incremental_marking()->AdvanceOnAllocation();
+    }
+  }
+  embedder_allocated_size_limit_for_check_ =
+      embedder_allocated_size_ + kIncrementalMarkingCheckInterval;
 }
 
 void CppHeap::CollectGarbage(cppgc::internal::GCConfig config) {
@@ -1401,3 +1489,99 @@ bool CppHeap::CurrentThreadIsHeapThread() const {
 
 }  // namespace internal
 }  // namespace v8
+
+// kun: include/v8-kun.h.
+namespace v8::kun {
+
+void SetEmbedderMarking(v8::CppHeap* heap, EmbedderMarking* marking) {
+  internal::CppHeap::From(heap)->set_embedder_marking(marking);
+}
+
+void ReportEmbedderAllocation(v8::Isolate* isolate, int64_t delta) {
+  auto* heap = reinterpret_cast<internal::Isolate*>(isolate)->heap();
+  if (!heap->cpp_heap()) return;
+  internal::CppHeap::From(heap->cpp_heap())->ReportEmbedderAllocation(delta);
+}
+
+void FinishMarking(v8::Isolate* isolate) {
+  reinterpret_cast<internal::Isolate*>(isolate)
+      ->heap()
+      ->FinalizeIncrementalMarkingAtomicallyIfRunning(
+          internal::GarbageCollectionReason::kExternalFinalize);
+}
+
+void Wrap(v8::Isolate* isolate, Local<Object> wrapper, void* object,
+          uint16_t tag) {
+  CHECK_NOT_NULL(object);
+  CHECK(tag >= static_cast<uint16_t>(kFirstTag) &&
+        tag <= static_cast<uint16_t>(kLastTag));
+  auto obj = internal::Tagged<internal::Object>(
+      internal::ValueHelper::ValueAsAddress(*wrapper));
+  CHECK(internal::IsJSApiWrapperObject(internal::Cast<internal::JSObject>(obj)));
+  internal::CppHeapObjectWrapper(internal::Cast<internal::JSObject>(obj))
+      .SetCppHeapWrappable(reinterpret_cast<internal::Isolate*>(isolate),
+                           object, static_cast<CppHeapPointerTag>(tag));
+}
+
+void* Unwrap(v8::Isolate* isolate, Local<Object> wrapper, uint16_t tag) {
+  auto obj = internal::Tagged<internal::Object>(
+      internal::ValueHelper::ValueAsAddress(*wrapper));
+  if (!internal::IsJSApiWrapperObject(internal::Cast<internal::HeapObject>(obj))) {
+    return nullptr;
+  }
+  // Another tag's entry reads as none.
+  const auto tag_value = static_cast<CppHeapPointerTag>(tag);
+  return internal::CppHeapObjectWrapper(internal::Cast<internal::JSObject>(obj))
+      .GetCppHeapWrappable(reinterpret_cast<internal::Isolate*>(isolate),
+                           CppHeapPointerTagRange(tag_value, tag_value));
+}
+
+namespace {
+
+// What a TracedMarker holds: as ConcurrentUnifiedHeapMarkingVisitor, V8's
+// worklist of its own, the marking state over it, and the isolate set as
+// the thread's current.
+struct TracedMarkerImpl {
+  explicit TracedMarkerImpl(internal::Heap* heap)
+      : worklist(heap->mark_compact_collector()->marking_worklists()),
+        state(heap, &worklist, cppgc::internal::CollectionType::kMajor) {
+    scope.emplace(heap->isolate());
+#ifdef V8_COMPRESS_POINTERS_IN_MULTIPLE_CAGES
+    saved_isolate_group = internal::IsolateGroup::current();
+    internal::IsolateGroup::set_current(heap->isolate()->isolate_group());
+#endif
+  }
+  ~TracedMarkerImpl() {
+    worklist.Publish();
+#ifdef V8_COMPRESS_POINTERS_IN_MULTIPLE_CAGES
+    internal::IsolateGroup::set_current(saved_isolate_group);
+#endif
+  }
+
+  internal::MarkingWorklists::Local worklist;
+  internal::UnifiedHeapMarkingState state;
+  std::optional<internal::SetCurrentIsolateScope> scope;
+#ifdef V8_COMPRESS_POINTERS_IN_MULTIPLE_CAGES
+  internal::IsolateGroup* saved_isolate_group = nullptr;
+#endif
+};
+
+}  // namespace
+
+TracedMarker::TracedMarker(v8::Isolate* isolate)
+    : impl_(new TracedMarkerImpl(
+          reinterpret_cast<internal::Isolate*>(isolate)->heap())) {}
+
+TracedMarker::~TracedMarker() {
+  delete static_cast<TracedMarkerImpl*>(impl_);
+}
+
+void TracedMarker::Mark(const TracedReferenceBase& reference) {
+  static_cast<TracedMarkerImpl*>(impl_)->state.MarkAndPush(reference);
+}
+
+void TracedMarker::Publish() {
+  static_cast<TracedMarkerImpl*>(impl_)->worklist.Publish();
+}
+
+}  // namespace v8::kun

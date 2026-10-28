@@ -26,6 +26,11 @@ static_assert(
 #include "src/objects/cpp-heap-object-wrapper.h"
 #include "src/objects/js-objects.h"
 
+// kun: the embedder heap marking with major GCs (include/v8-kun.h).
+namespace v8::kun {
+class EmbedderMarking;
+}  // namespace v8::kun
+
 namespace v8 {
 
 class Isolate;
@@ -161,6 +166,20 @@ class V8_EXPORT_PRIVATE CppHeap final
 
   bool ShouldFinalizeIncrementalMarking() const;
 
+  // kun: the embedder heap marking with major GCs, and its used bytes
+  // (include/v8-kun.h).
+  void set_embedder_marking(v8::kun::EmbedderMarking* marking) {
+    embedder_marking_ = marking;
+    // Unset while marking: the rest of this GC goes without it (the
+    // marking states keep their locals).
+    if (!marking) embedder_marking_started_ = false;
+  }
+  bool embedder_marks() const;
+  size_t embedder_used_size() const {
+    return embedder_used_size_.load(std::memory_order_relaxed);
+  }
+  void ReportEmbedderAllocation(int64_t delta);
+
   // StatsCollector::AllocationObserver interface.
   void AllocatedObjectSizeIncreased(size_t) final;
   void AllocatedObjectSizeDecreased(size_t) final;
@@ -239,6 +258,14 @@ class V8_EXPORT_PRIVATE CppHeap final
   Isolate* isolate_ = nullptr;
   Heap* heap_ = nullptr;
   bool marking_done_ = true;
+  // kun: the embedder heap, whether it marks in this GC, its used bytes and
+  // what it allocated (as `used_size_`, `allocated_size_` and
+  // `allocated_size_limit_for_check_` are cppgc's).
+  v8::kun::EmbedderMarking* embedder_marking_ = nullptr;
+  bool embedder_marking_started_ = false;
+  std::atomic<size_t> embedder_used_size_{0};
+  uint64_t embedder_allocated_size_ = 0;
+  size_t embedder_allocated_size_limit_for_check_ = 0;
   // |collection_type_| is initialized when marking is in progress.
   std::optional<CollectionType> collection_type_;
   GarbageCollectionFlags current_gc_flags_;
