@@ -26,10 +26,10 @@ static_assert(
 #include "src/objects/cpp-heap-object-wrapper.h"
 #include "src/objects/js-objects.h"
 
-// kun: the embedder heap marking with major GCs (include/v8-kun.h).
-namespace v8::kun {
+// machopo: the embedder heap marking with major GCs (include/v8-machopo.h).
+namespace v8::machopo {
 class EmbedderMarking;
-}  // namespace v8::kun
+}  // namespace v8::machopo
 
 namespace v8 {
 
@@ -166,9 +166,9 @@ class V8_EXPORT_PRIVATE CppHeap final
 
   bool ShouldFinalizeIncrementalMarking() const;
 
-  // kun: the embedder heap marking with major GCs, and its used bytes
-  // (include/v8-kun.h).
-  void set_embedder_marking(v8::kun::EmbedderMarking* marking) {
+  // machopo: the embedder heap marking with major GCs, and its used bytes
+  // (include/v8-machopo.h).
+  void set_embedder_marking(v8::machopo::EmbedderMarking* marking) {
     embedder_marking_ = marking;
     // Unset while marking: the rest of this GC goes without it (the
     // marking states keep their locals).
@@ -258,10 +258,10 @@ class V8_EXPORT_PRIVATE CppHeap final
   Isolate* isolate_ = nullptr;
   Heap* heap_ = nullptr;
   bool marking_done_ = true;
-  // kun: the embedder heap, whether it marks in this GC, its used bytes and
+  // machopo: the embedder heap, whether it marks in this GC, its used bytes and
   // what it allocated (as `used_size_`, `allocated_size_` and
   // `allocated_size_limit_for_check_` are cppgc's).
-  v8::kun::EmbedderMarking* embedder_marking_ = nullptr;
+  v8::machopo::EmbedderMarking* embedder_marking_ = nullptr;
   bool embedder_marking_started_ = false;
   std::atomic<size_t> embedder_used_size_{0};
   uint64_t embedder_allocated_size_ = 0;

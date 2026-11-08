@@ -12,7 +12,7 @@
 #include "include/cppgc/heap-consistency.h"
 #include "include/cppgc/platform.h"
 #include "include/v8-isolate.h"
-#include "include/v8-kun.h"
+#include "include/v8-machopo.h"
 #include "include/v8-local-handle.h"
 #include "include/v8-platform.h"
 #include "src/api/api-inl.h"
@@ -56,7 +56,7 @@
 #include "src/heap/minor-mark-sweep.h"
 #include "src/heap/traced-handles-marking-visitor.h"
 #include "src/init/v8.h"
-#include "src/objects/cpp-heap-object-wrapper-inl.h"  // kun
+#include "src/objects/cpp-heap-object-wrapper-inl.h"  // machopo
 #include "src/profiler/heap-profiler.h"
 
 namespace v8 {
@@ -841,7 +841,7 @@ void CppHeap::InitializeMarking(
   marker_ = std::make_unique<UnifiedHeapMarker>(
       isolate_ ? isolate()->heap() : nullptr, AsBase(), schedule,
       platform_.get(), marking_config);
-  // kun: the embedder heap marks with major GCs, from now on: V8 makes its
+  // machopo: the embedder heap marks with major GCs, from now on: V8 makes its
   // marking states, each with the embedder heap's local, before it starts
   // ours (StartMarking).
   embedder_marking_started_ =
@@ -875,7 +875,7 @@ void CppHeap::StartMarking() {
   marking_done_ = false;
 }
 
-// kun: whether the embedder heap marks in this GC.
+// machopo: whether the embedder heap marks in this GC.
 bool CppHeap::embedder_marks() const {
   return TracingInitialized() && embedder_marking_started_;
 }
@@ -891,7 +891,7 @@ bool CppHeap::AdvanceMarking(v8::base::TimeDelta max_duration,
   if (!TracingInitialized()) {
     return true;
   }
-  // kun: the embedder heap's step gets what cppgc's leaves of the step.
+  // machopo: the embedder heap's step gets what cppgc's leaves of the step.
   const auto step_start = v8::base::TimeTicks::Now();
   is_in_v8_marking_step_ = true;
   cppgc::internal::StatsCollector::EnabledScope stats_scope(
@@ -906,7 +906,7 @@ bool CppHeap::AdvanceMarking(v8::base::TimeDelta max_duration,
   marking_done_ = marker_->To<UnifiedHeapMarker>().AdvanceMarkingOnStep(
       max_duration, marked_bytes_limit, stack_state);
   DCHECK_IMPLIES(in_atomic_pause_, marking_done_);
-  // kun: the embedder heap advances with cppgc, every step (what the step
+  // machopo: the embedder heap advances with cppgc, every step (what the step
   // marked may have handed it more); IsMarkingDone asks it again.
   bool embedder_done = true;
   if (embedder_marks()) {
@@ -929,7 +929,7 @@ bool CppHeap::AdvanceMarking(v8::base::TimeDelta max_duration,
 }
 
 bool CppHeap::IsMarkingDone() const {
-  // kun: and the embedder heap's, as it is now (V8's threads may have
+  // machopo: and the embedder heap's, as it is now (V8's threads may have
   // handed it more since its last step).
   return !TracingInitialized() ||
          (marking_done_ &&
@@ -1007,11 +1007,11 @@ void CppHeap::ProcessCrossThreadWeakness() {
 void CppHeap::FinishMarkingAndProcessWeakness() {
   CHECK(in_atomic_pause_);
   CHECK(marking_done_);
-  // kun: both sides are done; the embedder heap ends its marking.
+  // machopo: both sides are done; the embedder heap ends its marking.
   if (embedder_marks()) {
     CHECK(embedder_marking_->IsDone());
     embedder_marking_started_ = false;
-    // kun: the embedder heap's live bytes, before V8 sets its limits from
+    // machopo: the embedder heap's live bytes, before V8 sets its limits from
     // its size (Heap::MarkCompact's UpdateConsumedAfterGC), as cppgc's
     // marked bytes are.
     embedder_used_size_.store(embedder_marking_->End(),
@@ -1333,9 +1333,9 @@ std::unique_ptr<CppMarkingState> CppHeap::CreateCppMarkingState() {
   auto state = std::make_unique<CppMarkingState>(
       std::make_unique<cppgc::internal::MarkingStateBase>(
           AsBase(), marker()->To<UnifiedHeapMarker>().GetMarkingWorklists()));
-  // kun: the embedder heap's local, for the objects V8 hands over.
+  // machopo: the embedder heap's local, for the objects V8 hands over.
   if (embedder_marks()) {
-    state->set_kun_local(embedder_marking_, embedder_marking_->NewLocal());
+    state->set_machopo_local(embedder_marking_, embedder_marking_->NewLocal());
   }
   return state;
 }
@@ -1346,15 +1346,15 @@ CppHeap::CreateCppMarkingStateForMutatorThread() {
   DCHECK(IsMarking());
   auto state = std::make_unique<CppMarkingState>(
       marker()->To<UnifiedHeapMarker>().GetMutatorMarkingState());
-  // kun: as above.
+  // machopo: as above.
   if (embedder_marks()) {
-    state->set_kun_local(embedder_marking_, embedder_marking_->NewLocal());
+    state->set_machopo_local(embedder_marking_, embedder_marking_->NewLocal());
   }
   return state;
 }
 
-// kun: as ReportBufferedAllocationSizeIfPossible, for the embedder heap's
-// used bytes, a total (include/v8-kun.h).
+// machopo: as ReportBufferedAllocationSizeIfPossible, for the embedder heap's
+// used bytes, a total (include/v8-machopo.h).
 void CppHeap::ReportEmbedderUsedSize(size_t used) {
   size_t before = embedder_used_size_.exchange(used, std::memory_order_relaxed);
   if (used <= before) return;
@@ -1487,8 +1487,8 @@ bool CppHeap::CurrentThreadIsHeapThread() const {
 }  // namespace internal
 }  // namespace v8
 
-// kun: include/v8-kun.h.
-namespace v8::kun {
+// machopo: include/v8-machopo.h.
+namespace v8::machopo {
 
 void SetEmbedderMarking(v8::CppHeap* heap, EmbedderMarking* marking) {
   internal::CppHeap::From(heap)->set_embedder_marking(marking);
@@ -1581,4 +1581,4 @@ void TracedMarker::Publish() {
   static_cast<TracedMarkerImpl*>(impl_)->worklist.Publish();
 }
 
-}  // namespace v8::kun
+}  // namespace v8::machopo

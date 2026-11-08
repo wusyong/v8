@@ -59,7 +59,7 @@ void* CppHeapObjectWrapper::GetCppHeapWrappable(
       object_->ReadCppHeapPointerField(offset_, isolate, tag_range));
 }
 
-// kun: include/v8-kun.h.
+// machopo: include/v8-machopo.h.
 void* CppHeapObjectWrapper::TryGetCppHeapWrappable(
     IsolateForPointerCompression isolate,
     CppHeapPointerTagRange tag_range) const {

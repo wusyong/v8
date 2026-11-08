@@ -53,7 +53,7 @@ V8_INLINE Address ReadCppHeapPointerField(Address field_address,
 #endif  // !V8_COMPRESS_POINTERS
 }
 
-// kun: include/v8-kun.h.
+// machopo: include/v8-machopo.h.
 V8_INLINE Address TryReadCppHeapPointerField(
     Address field_address, IsolateForPointerCompression isolate,
     CppHeapPointerTagRange tag_range) {

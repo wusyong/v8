@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "include/v8-kun.h"  // kun
+#include "include/v8-machopo.h"  // machopo
 #include "src/heap/cppgc-js/cpp-snapshot.h"
 
 #include <memory>
@@ -79,9 +79,9 @@ void* ExtractEmbedderDataBackref(Isolate* isolate, CppHeap& cpp_heap,
   if (!IsJSApiWrapperObject(js_object)) {
     return nullptr;
   }
-  // kun: the embedder heap's object isn't cppgc's (include/v8-kun.h).
+  // machopo: the embedder heap's object isn't cppgc's (include/v8-machopo.h).
   if (CppHeapObjectWrapper(js_object).TryGetCppHeapWrappable(
-          isolate, kun::kTagRange)) {
+          isolate, machopo::kTagRange)) {
     return nullptr;
   }
   // Wrapper using cpp_heap_wrappable field.
@@ -521,9 +521,9 @@ void CppGraphBuilderImpl::RecordTracedReferenceOnStack(
 
 void CppGraphBuilderImpl::AddEdgeForCppHeapWrapper(
     Tagged<CppHeapPointerWrapperObjectT> object) {
-  // kun: the embedder heap's object isn't cppgc's (include/v8-kun.h).
+  // machopo: the embedder heap's object isn't cppgc's (include/v8-machopo.h).
   if (CppHeapObjectWrapper::From(object).TryGetCppHeapWrappable(
-          cpp_heap_.isolate(), kun::kTagRange)) {
+          cpp_heap_.isolate(), machopo::kTagRange)) {
     return;
   }
   void* cpp_object = CppHeapObjectWrapper::From(object).GetCppHeapWrappable(

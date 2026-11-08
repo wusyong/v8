@@ -1,5 +1,5 @@
-// kun: an embedder heap marking with V8's major GCs as cppgc's does in the
-// unified heap: kun's new DOM, on kun's own GC (crates/gc), with V8. In a
+// machopo: an embedder heap marking with V8's major GCs as cppgc's does in the
+// unified heap: machopo's new DOM, on machopo's own GC (crates/gc), with V8. In a
 // header of its own, so that changing it rebuilds only what includes it.
 //
 // The embedder heap's objects are wrapped by their address, as cppgc's,
@@ -9,8 +9,8 @@
 // marker hands V8 the TracedReferences its objects hold, from its own
 // threads.
 
-#ifndef INCLUDE_V8_KUN_H_
-#define INCLUDE_V8_KUN_H_
+#ifndef INCLUDE_V8_MACHOPO_H_
+#define INCLUDE_V8_MACHOPO_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -26,7 +26,7 @@ class Isolate;
 class Object;
 class TracedReferenceBase;
 
-namespace kun {
+namespace machopo {
 
 /** The tags of wrappers whose CppHeapPointerTable entry holds an embedder
  * heap's object (not a cppgc one). */
@@ -124,7 +124,7 @@ class V8_EXPORT TracedMarker {
   void* impl_;
 };
 
-}  // namespace kun
+}  // namespace machopo
 }  // namespace v8
 
-#endif  // INCLUDE_V8_KUN_H_
+#endif  // INCLUDE_V8_MACHOPO_H_

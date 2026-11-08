@@ -55,9 +55,9 @@ struct CppHeapPointerTableEntry {
   // specified tag range.
   inline bool HasPointer(CppHeapPointerTagRange tag_range) const;
 
-  // kun: Load and untag the pointer stored in this entry if its tag is within
+  // machopo: Load and untag the pointer stored in this entry if its tag is within
   // the specified tag range, otherwise return kNullAddress. Unlike GetPointer,
-  // the entry may hold any tag (include/v8-kun.h).
+  // the entry may hold any tag (include/v8-machopo.h).
   inline Address TryGetPointer(CppHeapPointerTagRange tag_range) const;
 
   // Invalidate the entry. Any access to a zapped entry will result in an
@@ -183,12 +183,12 @@ class V8_EXPORT_PRIVATE CppHeapPointerTable
   inline Address Get(CppHeapPointerHandle handle,
                      CppHeapPointerTagRange tag_range) const;
 
-  // kun: Retrieves the entry referenced by the given handle if its tag is
+  // machopo: Retrieves the entry referenced by the given handle if its tag is
   // within the specified range of tags, otherwise returns kNullAddress.
   //
   // Unlike Get, the entry may hold any tag: the embedder heap's wrappers share
   // the table with cppgc's, and V8 tells them apart by the tag
-  // (include/v8-kun.h).
+  // (include/v8-machopo.h).
   //
   // This method is atomic and can be called from background threads.
   inline Address TryGet(CppHeapPointerHandle handle,

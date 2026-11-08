@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "include/v8-kun.h"  // kun
+#include "include/v8-machopo.h"  // machopo
 #include "src/profiler/heap-profiler.h"
 
 #include <fstream>
@@ -66,8 +66,8 @@ std::vector<v8::Local<v8::Value>> HeapProfiler::GetDetachedJSWrapperObjects() {
     // Ensure object is wrappable, otherwise GetDetachedness() can crash
     CppHeapObjectWrapper wrapper = CppHeapObjectWrapper(Cast<JSObject>(obj));
     if (!wrapper.GetCppHeapWrappable(isolate(), kAnyCppHeapPointer)) continue;
-    // kun: the embedder heap's object isn't cppgc's (include/v8-kun.h).
-    if (wrapper.TryGetCppHeapWrappable(isolate(), kun::kTagRange)) {
+    // machopo: the embedder heap's object isn't cppgc's (include/v8-machopo.h).
+    if (wrapper.TryGetCppHeapWrappable(isolate(), machopo::kTagRange)) {
       continue;
     }
 

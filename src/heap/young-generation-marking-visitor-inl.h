@@ -5,7 +5,7 @@
 #ifndef V8_HEAP_YOUNG_GENERATION_MARKING_VISITOR_INL_H_
 #define V8_HEAP_YOUNG_GENERATION_MARKING_VISITOR_INL_H_
 
-#include "include/v8-kun.h"  // kun
+#include "include/v8-machopo.h"  // machopo
 #include "src/heap/young-generation-marking-visitor.h"
 // Include the non-inl header before the rest of the headers.
 
@@ -68,8 +68,8 @@ void YoungGenerationMarkingVisitor<marking_mode>::VisitCppHeapPointer(
     return;
   }
   const CppHeapPointerTable& table = isolate_->cpp_heap_pointer_table();
-  // kun: the embedder heap's object isn't cppgc's (include/v8-kun.h).
-  if (table.TryGet(handle, kun::kTagRange)) return;
+  // machopo: the embedder heap's object isn't cppgc's (include/v8-machopo.h).
+  if (table.TryGet(handle, machopo::kTagRange)) return;
   Address cpp_heap_pointer = table.Get(handle, kAnyCppHeapPointer);
 #else   // !V8_COMPRESS_POINTERS
   Address cpp_heap_pointer = slot.load();

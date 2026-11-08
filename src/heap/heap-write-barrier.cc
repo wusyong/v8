@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "include/v8-kun.h"  // kun
+#include "include/v8-machopo.h"  // machopo
 #include "src/heap/heap-write-barrier.h"
 
 #include "src/heap/heap-layout-inl.h"
@@ -86,9 +86,9 @@ void WriteBarrier::MarkingSlowFromCppHeapWrappable(
   // stay in sync to avoid a marked handle pointing to an unmarked object.
   SBXCHECK_EQ(table.Get(handle, kAnyCppHeapPointer),
               reinterpret_cast<Address>(object));
-  // kun: the embedder heap's object isn't cppgc's; one wrapped while it
-  // marks is marked already, black or in its snapshot (include/v8-kun.h).
-  if (table.TryGet(handle, kun::kTagRange)) return;
+  // machopo: the embedder heap's object isn't cppgc's; one wrapped while it
+  // marks is marked already, black or in its snapshot (include/v8-machopo.h).
+  if (table.TryGet(handle, machopo::kTagRange)) return;
 #endif  // V8_COMPRESS_POINTERS
 
   if (heap->cpp_heap() && object) {

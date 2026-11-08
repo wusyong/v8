@@ -1,16 +1,16 @@
-# V8 (kun's fork)
+# V8 (machopo's fork)
 
 | | |
 | --- | --- |
 | Upstream | https://github.com/denoland/v8: V8 with Deno's patches, a branch per V8 version (`15.2-lkgr-denoland`), re-made by Deno's autoroll and force-pushed |
 | Fork | https://github.com/wusyong/v8 |
-| Branch | `kun`, from `c4ca1ecc` (V8 15.2.124, what rusty_v8's `v152.2.0` pins) |
+| Branch | `machopo`, from `c4ca1ecc` (V8 15.2.124, what rusty_v8's `v152.2.0` pins) |
 | License | BSD-3-Clause (`LICENSE`) |
-| Used by | kun's rusty_v8 fork (https://github.com/wusyong/rusty_v8, branch `kun`): its `v8` submodule, whose glue (`src/binding.cc`) and Rust (`src/kun.rs`) bind what this adds; kun's `bindings` builds on that |
+| Used by | machopo's rusty_v8 fork (https://github.com/wusyong/rusty_v8, branch `machopo`): its `v8` submodule, whose glue (`src/binding.cc`) and Rust (`src/machopo.rs`) bind what this adds; machopo's `bindings` builds on that |
 
 ## Why a fork
 
-kun's DOM lives on kun's own GC (Rust, not cppgc), and its JS documents
+machopo's DOM lives on machopo's own GC (Rust, not cppgc), and its JS documents
 need that heap marked with V8's major GCs, as Chrome marks Blink's cppgc
 heap with V8's (the unified heap): V8 handing the embedder heap the objects
 of the wrappers it marks, the embedder heap handing V8 the
@@ -20,13 +20,13 @@ its marking is cppgc's. So the hooks are in V8 itself, next to `CppHeap`'s.
 
 ## Local modifications
 
-Code changes are marked with `kun:` comments.
+Code changes are marked with `machopo:` comments.
 
 - **An embedder heap marking with V8's major GCs** (2026-10-28):
-  `include/v8-kun.h` (in a header of its own, so that changing it rebuilds
+  `include/v8-machopo.h` (in a header of its own, so that changing it rebuilds
   only what includes it), and:
   - `src/heap/cppgc-js/cpp-heap.{h,cc}`: a `CppHeap` holds the embedder's
-    `kun::EmbedderMarking`, started with a major GC's marking
+    `machopo::EmbedderMarking`, started with a major GC's marking
     (`InitializeMarking`), advanced in each of V8's steps after cppgc's
     with what the step leaves (V8's main thread's handed objects published
     first: with `--single-threaded-gc` V8 shares none of that thread's
@@ -40,12 +40,12 @@ Code changes are marked with `kun:` comments.
     `StatsCollector::NotifyMarkingCompleted`); else V8 would count the
     dead the embedder has yet to sweep, and its limits would grow fourfold
     each GC.
-    `kun::Wrap` and `Unwrap` put the embedder's object's address in a
+    `machopo::Wrap` and `Unwrap` put the embedder's object's address in a
     wrapper's `CppHeapPointerTable` entry with a tag of
-    `kun::kTagRange` (`0x4000..=0x4fff`). `kun::TracedMarker` is the
+    `machopo::kTagRange` (`0x4000..=0x4fff`). `machopo::TracedMarker` is the
     embedder heap's threads' marking of `TracedReference`s into V8's
     worklists (as `ConcurrentUnifiedHeapMarkingVisitor`).
-    `kun::FinishMarking` finishes a GC that runs, before the embedder heap
+    `machopo::FinishMarking` finishes a GC that runs, before the embedder heap
     is unset (as Chrome before it detaches a `CppHeap`).
   - `src/heap/cppgc-js/cpp-marking-state.h`: each marking state holds the
     embedder's local list of objects to hand over, published and deleted
@@ -66,10 +66,10 @@ Code changes are marked with `kun:` comments.
     `CppHeapObjectWrapper::TryGetCppHeapWrappable` read an entry of any
     tag and return null unless its tag is within the range, as the public
     `Object::Unwrap` does. Everything above that asks whether an entry
-    holds one of the tags, and `kun::Unwrap`, reads through them: `Get`
+    holds one of the tags, and `machopo::Unwrap`, reads through them: `Get`
     expects the caller to know the entry's tag (a debug build's `DCHECK`),
     and a cppgc wrapper's or V8's own entries (a `NativeContext`'s, marked
-    by `mksnapshot`) don't have one of kun's (2026-10-28).
+    by `mksnapshot`) don't have one of machopo's (2026-10-28).
 
   Only with pointer compression: the tags are the `CppHeapPointerTable`'s.
   Nothing changes until an embedder marking is set: cppgc's heap and
@@ -77,10 +77,10 @@ Code changes are marked with `kun:` comments.
 
 ## Updating
 
-When rusty_v8 moves to a new V8 version: rebase `kun` onto the commit
+When rusty_v8 moves to a new V8 version: rebase `machopo` onto the commit
 that rusty_v8's new tag pins (on `denoland/v8`'s branch for that version),
-check each `kun:` change against the code it hooks (`CppHeap`'s marking,
+check each `machopo:` change against the code it hooks (`CppHeap`'s marking,
 `MarkingVisitorBase::VisitCppHeapPointer`, `CppHeapObjectWrapper`,
 `CppHeapPointerTable::Get`; a release build doesn't run V8's `DCHECK`s,
-the debug jobs of rusty_v8's `kun-release` workflow do), push it, and point kun's rusty_v8 fork's submodule at it (that fork's
-`README.kun.md`, "Updating").
+the debug jobs of rusty_v8's `machopo-release` workflow do), push it, and point machopo's rusty_v8 fork's submodule at it (that fork's
+`README.machopo.md`, "Updating").
